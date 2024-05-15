@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""A simple cache using Redis."""
+"""
+A simple cache using Redis.
+"""
 
+from typing import Callable, Optional, Union
 import redis
 from uuid import uuid4
-from typing import Union, Optional, Callable
 from functools import wraps
+
+# Initialize Redis client
+redis_store = redis.Redis()
 
 
 def count_calls(method: Callable) -> Callable:
@@ -49,7 +54,12 @@ class Cache:
         self._redis.set(random_key, data)
         return random_key
 
-    def get(self, key: str, fn: Optional[Callable] = None) -> Union[str, bytes, int, float]:
+    def get(
+    self, 
+    key: str, 
+    fn: Optional[Callable] = None
+) -> Union[str, bytes, int, float]:
+
         """Retrieve data from Redis using the provided key."""
         value = self._redis.get(key)
         if fn:
@@ -67,8 +77,8 @@ class Cache:
         return int(value.decode("utf-8")) if value else 0
 
 
-def replay(fn: Callable):
-    """display the history of calls of a particular function"""
+def replay(fn: Callable) -> None:
+    """Display the history of calls of a particular function."""
     r = redis.Redis()
     function_name = fn.__qualname__
     value = r.get(function_name)
@@ -77,28 +87,14 @@ def replay(fn: Callable):
     except Exception:
         value = 0
 
-    # print(f"{function_name} was called {value} times")
     print("{} was called {} times:".format(function_name, value))
-    # inputs = r.lrange(f"{function_name}:inputs", 0, -1)
     inputs = r.lrange("{}:inputs".format(function_name), 0, -1)
-
-    # outputs = r.lrange(f"{function_name}:outputs", 0, -1)
     outputs = r.lrange("{}:outputs".format(function_name), 0, -1)
 
-    for input, output in zip(inputs, outputs):
-        try:
-            input = input.decode("utf-8")
-        except Exception:
-            input = ""
-
-        try:
-            output = output.decode("utf-8")
-        except Exception:
-            output = ""
-
-        # print(f"{function_name}(*{input}) -> {output}")
-        print("{}(*{}) -> {}".format(function_name, input, output))
-
+    for input_data, output_data in zip(inputs, outputs):
+        input_str = input_data.decode("utf-8") if input_data else ""
+        output_str = output_data.decode("utf-8") if output_data else ""
+        print("{}(*{}) -> {}".format(function_name, input_str, output_str))
 
 
 if __name__ == "__main__":
@@ -107,4 +103,3 @@ if __name__ == "__main__":
     cache.store("bar")
     cache.store(42)
     replay(cache.store)
-
