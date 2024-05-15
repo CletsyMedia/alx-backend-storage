@@ -1,48 +1,47 @@
 #!/usr/bin/env python3
 """
-Implementing an expiring web cache and tracker.
+A module with tools for request caching and tracking.
 """
-
-import requests
 import redis
-from typing import Optional
+import requests
+from functools import wraps
+from typing import Callable
 
 # Initialize Redis client
-redis_client = redis.Redis()
+redis_store = redis.Redis()
 
 
+def data_cacher(method: Callable) -> Callable:
+    """
+    Decorator to cache the output of fetched data and track the
+    number of times a URL was accessed.
+    """
+    @wraps(method)
+    def wrapper(url: str) -> str:
+        """
+        Wrapper function for caching the output and tracking the request.
+        """
+        redis_store.incr(f'count:{url}')
+        result = redis_store.get(f'result:{url}')
+        if result:
+            return result.decode('utf-8')
+        result = method(url)
+        redis_store.setex(f'result:{url}', 10, result)
+        return result
+    return wrapper
+
+
+@data_cacher
 def get_page(url: str) -> str:
     """
-    Retrieve the HTML content of a URL and cache it with an expiration time of 10 seconds.
-    Track the number of times the URL was accessed.
-
-    Args:
-        url (str): The URL to fetch the HTML content from.
-
-    Returns:
-        str: The HTML content of the URL.
+    Fetches the content of a URL using requests module and
+    caches the response.
     """
-    # Track the number of times the URL was accessed
-    redis_client.incr(f"count:{url}")
-
-    # Check if the URL content is cached
-    cached_content = redis_client.get(url)
-    if cached_content:
-        return cached_content.decode("utf-8")
-
-    # Fetch the HTML content from the URL
-    response = requests.get(url)
-    html_content = response.text
-
-    # Cache the HTML content with an expiration time of 10 seconds
-    redis_client.setex(url, 10, html_content)
-
-    return html_content
+    return requests.get(url).text
 
 
 if __name__ == "__main__":
-    # Test the get_page function
+    # Example usage
     url = "http://slowwly.robertomurray.co.uk/delay/1000/url/https://www.example.com"
     html_content = get_page(url)
     print(html_content)
-
