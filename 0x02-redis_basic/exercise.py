@@ -55,11 +55,10 @@ class Cache:
         return random_key
 
     def get(
-    self, 
-    key: str, 
-    fn: Optional[Callable] = None
-) -> Union[str, bytes, int, float]:
-
+        self,
+        key: str,
+        fn: Optional[Callable] = None
+    ) -> Union[str, bytes, int, float]:
         """Retrieve data from Redis using the provided key."""
         value = self._redis.get(key)
         if fn:
